@@ -19,6 +19,7 @@ if PROJECT_ROOT not in sys.path:
 
 from config import DATABASE_PATH
 from utils.logger import logger
+print("CONNECTED DATABASE:", DATABASE_PATH)
 
 
 # =====================================================
