@@ -1,0 +1,267 @@
+from datetime import datetime
+
+import streamlit as st
+
+from database.database import (
+    get_connection,
+    fetch_all,
+    fetch_one
+)
+
+
+# =====================================================
+# ENSURE TABLE COLUMNS
+# =====================================================
+
+def ensure_audit_logs_columns(cursor):
+    """
+    Ensure optional columns exist.
+    """
+
+    cursor.execute(
+        "PRAGMA table_info(audit_logs)"
+    )
+
+    existing_columns = {
+        row[1]
+        for row in cursor.fetchall()
+    }
+
+    if "description" not in existing_columns:
+
+        cursor.execute(
+            """
+            ALTER TABLE audit_logs
+            ADD COLUMN description TEXT
+            """
+        )
+
+    if "ip_address" not in existing_columns:
+
+        cursor.execute(
+            """
+            ALTER TABLE audit_logs
+            ADD COLUMN ip_address TEXT
+            """
+        )
+
+
+# =====================================================
+# LOG USER ACTIVITY
+# =====================================================
+
+def log_activity(
+    user_id,
+    action,
+    description=None,
+    ip_address=None
+):
+    """
+    Store activity in audit_logs.
+    """
+
+    try:
+
+        conn = get_connection()
+
+        cursor = conn.cursor()
+
+        ensure_audit_logs_columns(
+            cursor
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO audit_logs
+            (
+                user_id,
+                action,
+                description,
+                ip_address,
+                created_at
+            )
+            VALUES
+            (?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                action,
+                description,
+                ip_address,
+                datetime.now()
+            )
+        )
+
+        conn.commit()
+
+    finally:
+
+        conn.close()
+
+
+# =====================================================
+# RECENT ACTIVITIES
+# =====================================================
+
+@st.cache_data(
+    ttl=60,
+    show_spinner=False
+)
+def get_recent_activities(limit=100):
+    """
+    Return recent audit activities.
+    """
+
+    query = """
+    SELECT
+
+        a.id,
+        a.user_id,
+        a.action,
+        a.description,
+        a.ip_address,
+        a.created_at,
+
+        u.full_name,
+        u.email,
+        u.role
+
+    FROM audit_logs a
+
+    LEFT JOIN users u
+    ON a.user_id = u.id
+
+    ORDER BY a.created_at DESC
+
+    LIMIT ?
+    """
+
+    return fetch_all(
+        query,
+        (limit,)
+    )
+
+
+# =====================================================
+# TOTAL ACTIVITIES
+# =====================================================
+
+@st.cache_data(
+    ttl=60,
+    show_spinner=False
+)
+def total_activities():
+
+    row = fetch_one(
+        """
+        SELECT
+            COUNT(*) AS total
+        FROM audit_logs
+        """
+    )
+
+    return row["total"] if row else 0
+
+
+# =====================================================
+# SUCCESSFUL LOGINS
+# =====================================================
+
+@st.cache_data(
+    ttl=60,
+    show_spinner=False
+)
+def successful_login_count():
+
+    row = fetch_one(
+        """
+        SELECT
+            COUNT(*) AS total
+        FROM audit_logs
+        WHERE action='LOGIN_SUCCESS'
+        """
+    )
+
+    return row["total"] if row else 0
+
+
+# =====================================================
+# FAILED LOGINS
+# =====================================================
+
+@st.cache_data(
+    ttl=60,
+    show_spinner=False
+)
+def failed_login_count():
+
+    row = fetch_one(
+        """
+        SELECT
+            COUNT(*) AS total
+        FROM audit_logs
+        WHERE action='LOGIN_FAILED'
+        """
+    )
+
+    return row["total"] if row else 0
+
+
+# =====================================================
+# ACTIVITIES BY ACTION
+# =====================================================
+
+@st.cache_data(
+    ttl=60,
+    show_spinner=False
+)
+def get_activities_by_action(action):
+    """
+    Return all audit records
+    for one action.
+    """
+
+    query = """
+    SELECT *
+
+    FROM audit_logs
+
+    WHERE action = ?
+
+    ORDER BY created_at DESC
+    """
+
+    return fetch_all(
+        query,
+        (action,)
+    )
+
+
+# =====================================================
+# USER ACTIVITY
+# =====================================================
+
+@st.cache_data(
+    ttl=60,
+    show_spinner=False
+)
+def get_user_activity(user_id):
+    """
+    Return activity history
+    of one user.
+    """
+
+    query = """
+    SELECT *
+
+    FROM audit_logs
+
+    WHERE user_id = ?
+
+    ORDER BY created_at DESC
+    """
+
+    return fetch_all(
+        query,
+        (user_id,)
+    )
