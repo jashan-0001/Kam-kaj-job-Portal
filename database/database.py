@@ -87,6 +87,8 @@ def execute_query(
     params: tuple = ()
 ) -> bool:
 
+    conn = None
+
     try:
 
         with get_cursor() as (conn, cursor):
@@ -109,11 +111,10 @@ def execute_query(
             pass
 
         logger.exception(
-            f"execute_query failed.\nSQL: {query}\nError: {e}"
+            f"execute_query failed.\nSQL:\n{query}\nError: {e}"
         )
 
         return False
-
 
 # =====================================================
 # FETCH ONE
