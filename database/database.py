@@ -41,8 +41,7 @@ def get_connection() -> sqlite3.Connection:
     # -------------------------------------------------
     # SQLite Production Optimizations
     # -------------------------------------------------
-
-    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA journal_mode=DELETE;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.execute("PRAGMA temp_store=MEMORY;")
