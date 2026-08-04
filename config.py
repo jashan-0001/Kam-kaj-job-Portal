@@ -26,7 +26,14 @@ DEBUG_MODE = True
 # DATABASE
 # =====================================================
 
-DATABASE_PATH = BASE_DIR / "database" / "jobportal.db"
+DATABASE_DIR = Path("/tmp")
+
+DATABASE_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
+DATABASE_PATH = DATABASE_DIR / "jobportal.db"
 
 
 # =====================================================
