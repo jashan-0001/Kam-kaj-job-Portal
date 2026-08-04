@@ -1,61 +1,121 @@
 import bcrypt
 
-from database.database import execute_query, fetch_one
+from database.database import (
+    fetch_one,
+    execute_query
+)
+
+from utils.logger import logger
 
 
-ADMIN_NAME = "Administrator"
-ADMIN_EMAIL = "admin@kamkaj.com"
+# =====================================================
+# DEFAULT ADMIN DETAILS
+# =====================================================
+
+ADMIN_NAME = "System Administrator"
+
+ADMIN_EMAIL = "admin@portal.com"
+
 ADMIN_PASSWORD = "Admin@123"
+
 ADMIN_PHONE = "9999999999"
 
+ADMIN_ROLE = "Admin"
 
-def create_admin():
 
-    existing = fetch_one(
-        "SELECT id FROM users WHERE email = ?",
-        (ADMIN_EMAIL,)
-    )
+# =====================================================
+# CREATE DEFAULT ADMIN
+# =====================================================
 
-    if existing:
-        print("Admin already exists.")
-        return
+def create_default_admin():
 
-    hashed_password = bcrypt.hashpw(
-        ADMIN_PASSWORD.encode(),
-        bcrypt.gensalt()
-    ).decode()
+    try:
 
-    success = execute_query(
-        """
-        INSERT INTO users
-        (
-            full_name,
-            email,
-            password,
-            role,
-            phone
+        logger.info(
+            "Checking for default admin account."
         )
-        VALUES
-        (
-            ?, ?, ?, ?, ?
-        )
-        """,
-        (
-            ADMIN_NAME,
-            ADMIN_EMAIL,
-            hashed_password,
-            "Admin",
-            ADMIN_PHONE
-        )
-    )
 
-    if success:
-        print("Admin created successfully.")
-        print(f"Email    : {ADMIN_EMAIL}")
-        print(f"Password : {ADMIN_PASSWORD}")
-    else:
-        print("Failed to create admin.")
+        existing = fetch_one(
+            """
+            SELECT id
+            FROM users
+            WHERE email = ?
+            """,
+            (ADMIN_EMAIL,)
+        )
 
+        if existing:
+
+            logger.info(
+                "Default admin already exists."
+            )
+
+            print("✅ Default admin already exists.")
+
+            return
+
+        hashed_password = bcrypt.hashpw(
+            ADMIN_PASSWORD.encode("utf-8"),
+            bcrypt.gensalt()
+        ).decode("utf-8")
+
+        success = execute_query(
+            """
+            INSERT INTO users
+            (
+                full_name,
+                email,
+                password,
+                role,
+                phone,
+                is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ADMIN_NAME,
+                ADMIN_EMAIL,
+                hashed_password,
+                ADMIN_ROLE,
+                ADMIN_PHONE,
+                1
+            )
+        )
+
+        if success:
+
+            logger.info(
+                "Default admin account created successfully."
+            )
+
+            print("\n===================================")
+            print(" Admin account created successfully")
+            print("===================================")
+            print(f"Email    : {ADMIN_EMAIL}")
+            print(f"Password : {ADMIN_PASSWORD}")
+            print("===================================\n")
+
+        else:
+
+            logger.error(
+                "Failed to create default admin."
+            )
+
+            print("❌ Failed to create admin account.")
+
+    except Exception:
+
+        logger.exception(
+            "Error while creating default admin."
+        )
+
+        print("❌ Unexpected error while creating admin.")
+
+
+# =====================================================
+# MAIN
+# =====================================================
 
 if __name__ == "__main__":
-    create_admin()
+
+    create_default_admin()
