@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 from utils.startup_validator import validate_startup
 from utils.error_handler import handle_exception
 from database.init_db import create_tables
+from database.init_db import initialize_database
+
+initialize_database()
 # =====================================================
 # LOAD ENVIRONMENT
 # =====================================================
