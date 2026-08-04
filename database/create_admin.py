@@ -33,20 +33,18 @@ hashed_password = bcrypt.hashpw(
 # CHECK EXISTING ADMIN
 # =====================================================
 
-existing = fetch_one(
-    """
-    SELECT id
-    FROM users
-    WHERE email = ?
-    """,
-    (ADMIN_EMAIL,)
-)
+def create_admin():
+    existing = fetch_one(
+        """
+        SELECT id
+        FROM users
+        WHERE email = ?
+        """,
+        (ADMIN_EMAIL,)
+    )
 
-if existing:
-
-    print("Admin account already exists.")
-
-else:
+    if existing:
+        return
 
     execute_query(
         """
