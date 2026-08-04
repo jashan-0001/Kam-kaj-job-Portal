@@ -59,7 +59,12 @@ def create_tables():
 # ============================================================
 
         cursor.execute("PRAGMA foreign_keys = ON;")
-        cursor.execute("PRAGMA journal_mode = WAL;")
+
+        try:
+           cursor.execute("PRAGMA journal_mode=WAL;")
+        except Exception:
+            pass
+
         cursor.execute("PRAGMA synchronous = NORMAL;")
         cursor.execute("PRAGMA temp_store = MEMORY;")
         cursor.execute("PRAGMA cache_size = -20000")
