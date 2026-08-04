@@ -254,13 +254,16 @@ try:
 # ==========================================================
 # ERROR HANDLING
 # ==========================================================
+except Exception as e:
 
-except Exception:
+    import traceback
 
     logger.exception(
         "Employer Dashboard crashed."
     )
 
-    st.error(
-        "Something went wrong while loading the dashboard. Please refresh the page and try again."
-    )
+    st.error(f"Error: {e}")
+
+    st.code(traceback.format_exc())
+
+    raise
