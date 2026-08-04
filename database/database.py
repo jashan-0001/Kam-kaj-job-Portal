@@ -88,8 +88,6 @@ def execute_query(
     params: tuple = ()
 ) -> bool:
 
-    conn = None
-
     try:
 
         with get_cursor() as (conn, cursor):
@@ -103,13 +101,16 @@ def execute_query(
 
             return True
 
-    except Exception:
+    except Exception as e:
 
-        if conn:
-            conn.rollback()
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
 
         logger.exception(
-            f"execute_query failed.\nSQL: {query}"
+            f"execute_query failed.\nSQL: {query}\nError: {e}"
         )
 
         return False
