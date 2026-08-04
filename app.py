@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 from utils.startup_validator import validate_startup
 from utils.error_handler import handle_exception
-
+from database.init_db import create_tables
 # =====================================================
 # LOAD ENVIRONMENT
 # =====================================================
@@ -25,9 +25,12 @@ st.set_page_config(
 # =====================================================
 
 try:
+    # Create database tables if they don't exist
+    create_tables()
 
-    # Validate application configuration
+    # Validate startup
     validate_startup()
+    
 
     # -----------------------------------------------
     # User not logged in
@@ -93,10 +96,4 @@ try:
 
 except Exception as e:
 
-    import traceback
-
-    st.error(str(e))
-
-    st.code(traceback.format_exc())
-
-    raise
+    handle_exception(e)

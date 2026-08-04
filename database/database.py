@@ -41,8 +41,7 @@ def get_connection() -> sqlite3.Connection:
     # -------------------------------------------------
     # SQLite Production Optimizations
     # -------------------------------------------------
-
-    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA journal_mode=DELETE;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.execute("PRAGMA temp_store=MEMORY;")
@@ -103,17 +102,19 @@ def execute_query(
 
             return True
 
-    except Exception:
+    except Exception as e:
 
-        if conn:
-            conn.rollback()
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
 
         logger.exception(
-            f"execute_query failed.\nSQL: {query}"
+            f"execute_query failed.\nSQL:\n{query}\nError: {e}"
         )
 
         return False
-
 
 # =====================================================
 # FETCH ONE
