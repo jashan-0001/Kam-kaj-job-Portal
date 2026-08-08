@@ -1,27 +1,15 @@
 import streamlit as st
-from dotenv import load_dotenv
 
 from utils.startup_validator import validate_startup
 from utils.error_handler import handle_exception
+
 from database.init_db import create_tables
 from database.create_admin import create_admin
 
-# =====================================================
-# LOAD ENVIRONMENT
-# =====================================================
 
-load_dotenv()
-
-# =====================================================
-# DATABASE INITIALIZATION
-# =====================================================
-
-create_tables()
-
-create_admin()
-# =====================================================
+# ============================================================
 # PAGE CONFIG
-# =====================================================
+# ============================================================
 
 st.set_page_config(
     page_title="AI Job Portal",
@@ -29,31 +17,55 @@ st.set_page_config(
     layout="wide"
 )
 
-# =====================================================
+
+# ============================================================
 # START APPLICATION
-# =====================================================
+# ============================================================
 
 try:
-   
-    # Validate startup
+
+    # ========================================================
+    # VALIDATE APPLICATION CONFIGURATION
+    # ========================================================
+
     validate_startup()
-    
 
-    # -----------------------------------------------
-    # User not logged in
-    # -----------------------------------------------
+    # ========================================================
+    # DATABASE INITIALIZATION
+    # ========================================================
 
-    if "logged_in" not in st.session_state:
+    create_tables()
 
-        st.title("💼 Kam - Kaj Job Portal")
+    # ========================================================
+    # CREATE DEFAULT ADMIN
+    # ========================================================
+
+    create_admin()
+
+    # ========================================================
+    # USER NOT LOGGED IN
+    # ========================================================
+
+    if not st.session_state.get(
+        "logged_in",
+        False
+    ):
+
+        st.title(
+            "💼 Kam - Kaj Job Portal"
+        )
 
         st.write(
-            "Welcome to kam - kaj Job Portal"
+            "Welcome to Kam - Kaj Job Portal"
         )
 
         st.divider()
 
         col1, col2 = st.columns(2)
+
+        # ----------------------------------------------------
+        # LOGIN
+        # ----------------------------------------------------
 
         with col1:
 
@@ -61,9 +73,14 @@ try:
                 "🔑 Login",
                 use_container_width=True
             ):
+
                 st.switch_page(
                     "pages/login.py"
                 )
+
+        # ----------------------------------------------------
+        # REGISTER
+        # ----------------------------------------------------
 
         with col2:
 
@@ -71,17 +88,24 @@ try:
                 "📝 Register",
                 use_container_width=True
             ):
+
                 st.switch_page(
                     "pages/register.py"
                 )
 
-    # -----------------------------------------------
-    # Logged in
-    # -----------------------------------------------
+    # ========================================================
+    # LOGGED IN
+    # ========================================================
 
     else:
 
-        role = st.session_state.get("role")
+        role = st.session_state.get(
+            "role"
+        )
+
+        # ----------------------------------------------------
+        # CANDIDATE
+        # ----------------------------------------------------
 
         if role == "Candidate":
 
@@ -89,17 +113,45 @@ try:
                 "pages/candidate_dashboard.py"
             )
 
+        # ----------------------------------------------------
+        # EMPLOYER
+        # ----------------------------------------------------
+
         elif role == "Employer":
 
             st.switch_page(
                 "pages/employer_dashboard.py"
             )
 
+        # ----------------------------------------------------
+        # ADMIN
+        # ----------------------------------------------------
+
+        elif role == "Admin":
+
+            st.switch_page(
+                "pages/admin_dashboard.py"
+            )
+
+        # ----------------------------------------------------
+        # INVALID ROLE
+        # ----------------------------------------------------
+
         else:
 
             st.error(
                 "Invalid user role."
             )
+
+            # Clear invalid login state
+            st.session_state.clear()
+
+            st.rerun()
+
+
+# ============================================================
+# GLOBAL ERROR HANDLING
+# ============================================================
 
 except Exception as e:
 
