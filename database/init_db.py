@@ -14,7 +14,6 @@ PROJECT_ROOT = os.path.dirname(
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-
 from database.database import get_connection
 from utils.logger import logger
 
