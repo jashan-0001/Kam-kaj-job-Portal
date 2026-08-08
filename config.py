@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-
+import streamlit as st
 from dotenv import load_dotenv
 
 # =====================================================
@@ -42,24 +42,10 @@ DATABASE_PATH = DATABASE_DIR / "jobportal.db"
 # POSTGRESQL / SUPABASE
 # =====================================================
 
-SUPABASE_DATABASE_URL = os.getenv(
-    "SUPABASE_DATABASE_URL"
+SUPABASE_DATABASE_URL = st.secrets.get(
+    "SUPABASE_DATABASE_URL",
+    os.getenv("SUPABASE_DATABASE_URL")
 )
-
-# Streamlit Cloud Secrets
-try:
-
-    import streamlit as st
-
-    if "SUPABASE_DATABASE_URL" in st.secrets:
-
-        SUPABASE_DATABASE_URL = st.secrets[
-            "SUPABASE_DATABASE_URL"
-        ]
-
-except Exception:
-    pass
-
 
 # =====================================================
 # UPLOAD DIRECTORIES
