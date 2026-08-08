@@ -1,10 +1,20 @@
 import streamlit as st
+from dotenv import load_dotenv
+
+from config import BASE_DIR
 
 from utils.startup_validator import validate_startup
 from utils.error_handler import handle_exception
 
 from database.init_db import create_tables
 from database.create_admin import create_admin
+
+
+# ============================================================
+# LOAD ENVIRONMENT
+# ============================================================
+
+load_dotenv(BASE_DIR / ".env")
 
 
 # ============================================================
@@ -24,36 +34,31 @@ st.set_page_config(
 
 try:
 
-    # ========================================================
-    # VALIDATE APPLICATION CONFIGURATION
-    # ========================================================
+    # --------------------------------------------------------
+    # 1. Validate configuration
+    # --------------------------------------------------------
 
     validate_startup()
 
-    # ========================================================
-    # DATABASE INITIALIZATION
-    # ========================================================
+    # --------------------------------------------------------
+    # 2. Initialize Supabase PostgreSQL database
+    # --------------------------------------------------------
 
     create_tables()
 
-    # ========================================================
-    # CREATE DEFAULT ADMIN
-    # ========================================================
+    # --------------------------------------------------------
+    # 3. Create default administrator
+    # --------------------------------------------------------
 
     create_admin()
 
-    # ========================================================
-    # USER NOT LOGGED IN
-    # ========================================================
+    # --------------------------------------------------------
+    # 4. User not logged in
+    # --------------------------------------------------------
 
-    if not st.session_state.get(
-        "logged_in",
-        False
-    ):
+    if not st.session_state.get("logged_in", False):
 
-        st.title(
-            "💼 Kam - Kaj Job Portal"
-        )
+        st.title("💼 Kam - Kaj Job Portal")
 
         st.write(
             "Welcome to Kam - Kaj Job Portal"
@@ -62,10 +67,6 @@ try:
         st.divider()
 
         col1, col2 = st.columns(2)
-
-        # ----------------------------------------------------
-        # LOGIN
-        # ----------------------------------------------------
 
         with col1:
 
@@ -78,10 +79,6 @@ try:
                     "pages/login.py"
                 )
 
-        # ----------------------------------------------------
-        # REGISTER
-        # ----------------------------------------------------
-
         with col2:
 
             if st.button(
@@ -93,19 +90,13 @@ try:
                     "pages/register.py"
                 )
 
-    # ========================================================
-    # LOGGED IN
-    # ========================================================
+    # --------------------------------------------------------
+    # 5. Logged in
+    # --------------------------------------------------------
 
     else:
 
-        role = st.session_state.get(
-            "role"
-        )
-
-        # ----------------------------------------------------
-        # CANDIDATE
-        # ----------------------------------------------------
+        role = st.session_state.get("role")
 
         if role == "Candidate":
 
@@ -113,45 +104,25 @@ try:
                 "pages/candidate_dashboard.py"
             )
 
-        # ----------------------------------------------------
-        # EMPLOYER
-        # ----------------------------------------------------
-
         elif role == "Employer":
 
             st.switch_page(
                 "pages/employer_dashboard.py"
             )
 
-        # ----------------------------------------------------
-        # ADMIN
-        # ----------------------------------------------------
-
         elif role == "Admin":
 
+            # Change this path if your admin page
+            # has a different filename.
             st.switch_page(
                 "pages/admin_dashboard.py"
             )
-
-        # ----------------------------------------------------
-        # INVALID ROLE
-        # ----------------------------------------------------
 
         else:
 
             st.error(
                 "Invalid user role."
             )
-
-            # Clear invalid login state
-            st.session_state.clear()
-
-            st.rerun()
-
-
-# ============================================================
-# GLOBAL ERROR HANDLING
-# ============================================================
 
 except Exception as e:
 
