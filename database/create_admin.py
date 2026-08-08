@@ -1,15 +1,17 @@
-import bcrypt
-
 from database.database import (
-    fetch_one,
-    execute_query
+    execute_query,
+    fetch_one
 )
+
+from services.auth import hash_password
+
+from constants import ROLE_ADMIN
 
 from utils.logger import logger
 
 
 # ============================================================
-# ADMIN CONFIGURATION
+# DEFAULT ADMIN CONFIGURATION
 # ============================================================
 
 ADMIN_NAME = "Administrator"
@@ -34,7 +36,7 @@ def create_admin():
     try:
 
         # ----------------------------------------------------
-        # CHECK WHETHER ADMIN ALREADY EXISTS
+        # Check whether admin already exists
         # ----------------------------------------------------
 
         existing = fetch_one(
@@ -56,17 +58,16 @@ def create_admin():
 
 
         # ----------------------------------------------------
-        # HASH ADMIN PASSWORD
+        # Hash administrator password
         # ----------------------------------------------------
 
-        hashed_password = bcrypt.hashpw(
-            ADMIN_PASSWORD.encode("utf-8"),
-            bcrypt.gensalt()
-        ).decode("utf-8")
+        hashed_password = hash_password(
+            ADMIN_PASSWORD
+        )
 
 
         # ----------------------------------------------------
-        # INSERT ADMIN
+        # Insert administrator
         # ----------------------------------------------------
 
         success = execute_query(
@@ -86,7 +87,7 @@ def create_admin():
                 ADMIN_NAME,
                 ADMIN_EMAIL,
                 hashed_password,
-                "Admin",
+                ROLE_ADMIN,
                 ADMIN_PHONE,
                 1
             )
@@ -94,20 +95,20 @@ def create_admin():
 
 
         # ----------------------------------------------------
-        # RESULT
+        # Result
         # ----------------------------------------------------
 
         if success:
 
             logger.info(
-                "Administrator account created successfully."
+                "Default administrator account created successfully."
             )
 
             return True
 
 
         logger.error(
-            "Failed to create administrator account."
+            "Failed to create default administrator account."
         )
 
         return False
@@ -116,7 +117,7 @@ def create_admin():
     except Exception:
 
         logger.exception(
-            "create_admin() failed."
+            "Administrator creation failed."
         )
 
         return False
