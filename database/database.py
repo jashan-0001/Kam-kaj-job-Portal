@@ -272,4 +272,3 @@ def execute_many(
         )
 
         return False
-```
