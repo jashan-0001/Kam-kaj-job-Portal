@@ -15,35 +15,18 @@ from database.database import (
 
 def ensure_audit_logs_columns(cursor):
     """
-    Ensure optional columns exist.
+    Ensure required audit_logs columns exist in PostgreSQL/Supabase.
     """
 
-    cursor.execute(
-        "PRAGMA table_info(audit_logs)"
-    )
+    cursor.execute("""
+        ALTER TABLE audit_logs
+        ADD COLUMN IF NOT EXISTS description TEXT
+    """)
 
-    existing_columns = {
-        row[1]
-        for row in cursor.fetchall()
-    }
-
-    if "description" not in existing_columns:
-
-        cursor.execute(
-            """
-            ALTER TABLE audit_logs
-            ADD COLUMN description TEXT
-            """
-        )
-
-    if "ip_address" not in existing_columns:
-
-        cursor.execute(
-            """
-            ALTER TABLE audit_logs
-            ADD COLUMN ip_address TEXT
-            """
-        )
+    cursor.execute("""
+        ALTER TABLE audit_logs
+        ADD COLUMN IF NOT EXISTS ip_address TEXT
+    """)
 
 
 # =====================================================
