@@ -6,10 +6,33 @@ from database.database import (
     fetch_one
 )
 
+from utils.logger import logger
 
-# ============================================================
+
+# =====================================================
+# ENSURE AUDIT LOG COLUMNS
+# =====================================================
+
+def ensure_audit_logs_columns(cursor):
+    """
+    Ensure required audit_logs columns exist
+    in PostgreSQL / Supabase.
+    """
+
+    cursor.execute("""
+        ALTER TABLE audit_logs
+        ADD COLUMN IF NOT EXISTS description TEXT
+    """)
+
+    cursor.execute("""
+        ALTER TABLE audit_logs
+        ADD COLUMN IF NOT EXISTS ip_address TEXT
+    """)
+
+
+# =====================================================
 # LOG USER ACTIVITY
-# ============================================================
+# =====================================================
 
 def log_activity(
     user_id,
@@ -29,9 +52,15 @@ def log_activity(
 
         cursor = conn.cursor()
 
-        # ----------------------------------------------------
-        # INSERT ACTIVITY
-        # ----------------------------------------------------
+        # -------------------------------------------------
+        # Ensure required columns exist
+        # -------------------------------------------------
+
+        ensure_audit_logs_columns(cursor)
+
+        # -------------------------------------------------
+        # Insert activity
+        # -------------------------------------------------
 
         cursor.execute(
             """
@@ -55,14 +84,12 @@ def log_activity(
 
         conn.commit()
 
-        # ----------------------------------------------------
-        # CLEAR AUDIT CACHE
-        # ----------------------------------------------------
+        logger.info(
+            f"Activity logged successfully. "
+            f"User ID={user_id}, Action={action}"
+        )
 
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
+        return True
 
     except Exception:
 
@@ -74,7 +101,11 @@ def log_activity(
             except Exception:
                 pass
 
-        raise
+        logger.exception(
+            "Failed to log user activity."
+        )
+
+        return False
 
     finally:
 
@@ -87,9 +118,9 @@ def log_activity(
                 pass
 
 
-# ============================================================
+# =====================================================
 # RECENT ACTIVITIES
-# ============================================================
+# =====================================================
 
 @st.cache_data(
     ttl=60,
@@ -100,104 +131,152 @@ def get_recent_activities(limit=100):
     Return recent audit activities.
     """
 
-    query = """
-    SELECT
+    try:
 
-        a.id,
-        a.user_id,
-        a.action,
-        a.description,
-        a.ip_address,
-        a.created_at,
+        query = """
+        SELECT
+            a.id,
+            a.user_id,
+            a.action,
+            a.description,
+            a.ip_address,
+            a.created_at,
 
-        u.full_name,
-        u.email,
-        u.role
+            u.full_name,
+            u.email,
+            u.role
 
-    FROM audit_logs a
+        FROM audit_logs a
 
-    LEFT JOIN users u
-        ON a.user_id = u.id
+        LEFT JOIN users u
+            ON a.user_id = u.id
 
-    ORDER BY a.created_at DESC
+        ORDER BY a.created_at DESC
 
-    LIMIT %s
-    """
+        LIMIT %s
+        """
 
-    return fetch_all(
-        query,
-        (limit,)
-    )
+        return fetch_all(
+            query,
+            (limit,)
+        )
+
+    except Exception:
+
+        logger.exception(
+            "Failed to fetch recent activities."
+        )
+
+        return []
 
 
-# ============================================================
+# =====================================================
 # TOTAL ACTIVITIES
-# ============================================================
+# =====================================================
 
 @st.cache_data(
-    ttl=60,
+    ttl=30,
     show_spinner=False
 )
 def total_activities():
+    """
+    Return total number of audit activities.
+    """
 
-    row = fetch_one(
-        """
-        SELECT
-            COUNT(*) AS total
-        FROM audit_logs
-        """
-    )
+    try:
 
-    return row["total"] if row else 0
+        row = fetch_one(
+            """
+            SELECT
+                COUNT(*) AS total
+            FROM audit_logs
+            """
+        )
+
+        return row["total"] if row else 0
+
+    except Exception:
+
+        logger.exception(
+            "Failed to calculate total activities."
+        )
+
+        return 0
 
 
-# ============================================================
+# =====================================================
 # SUCCESSFUL LOGINS
-# ============================================================
+# =====================================================
 
 @st.cache_data(
-    ttl=60,
+    ttl=30,
     show_spinner=False
 )
 def successful_login_count():
+    """
+    Return number of successful login activities.
+    """
 
-    row = fetch_one(
-        """
-        SELECT
-            COUNT(*) AS total
-        FROM audit_logs
-        WHERE action = 'LOGIN_SUCCESS'
-        """
-    )
+    try:
 
-    return row["total"] if row else 0
+        row = fetch_one(
+            """
+            SELECT
+                COUNT(*) AS total
+            FROM audit_logs
+            WHERE action = 'LOGIN_SUCCESS'
+            """
+        )
+
+        return row["total"] if row else 0
+
+    except Exception:
+
+        logger.exception(
+            "Failed to calculate successful logins."
+        )
+
+        return 0
 
 
-# ============================================================
+# =====================================================
 # FAILED LOGINS
-# ============================================================
+# =====================================================
 
 @st.cache_data(
-    ttl=60,
+    ttl=30,
     show_spinner=False
 )
 def failed_login_count():
+    """
+    Return number of failed login activities.
+    """
 
-    row = fetch_one(
-        """
-        SELECT
-            COUNT(*) AS total
-        FROM audit_logs
-        WHERE action = 'LOGIN_FAILED'
-        """
-    )
+    try:
 
-    return row["total"] if row else 0
+        row = fetch_one(
+            """
+            SELECT
+                COUNT(*) AS total
+            FROM audit_logs
+            WHERE action = 'LOGIN_FAILED'
+            """
+        )
+
+        return row["total"] if row else 0
+
+    except Exception:
+
+        logger.exception(
+            "Failed to calculate failed logins."
+        )
+
+        return 0
 
 
-# ============================================================
+# =====================================================
 # ACTIVITIES BY ACTION
-# ============================================================
+# =====================================================
 
 @st.cache_data(
     ttl=60,
@@ -205,28 +284,36 @@ def failed_login_count():
 )
 def get_activities_by_action(action):
     """
-    Return audit records for one action.
+    Return all audit records for one action.
     """
 
-    query = """
-    SELECT *
+    try:
 
-    FROM audit_logs
+        query = """
+        SELECT
+            *
+        FROM audit_logs
+        WHERE action = %s
+        ORDER BY created_at DESC
+        """
 
-    WHERE action = %s
+        return fetch_all(
+            query,
+            (action,)
+        )
 
-    ORDER BY created_at DESC
-    """
+    except Exception:
 
-    return fetch_all(
-        query,
-        (action,)
-    )
+        logger.exception(
+            f"Failed to fetch activities for action: {action}"
+        )
+
+        return []
 
 
-# ============================================================
+# =====================================================
 # USER ACTIVITY
-# ============================================================
+# =====================================================
 
 @st.cache_data(
     ttl=60,
@@ -237,17 +324,25 @@ def get_user_activity(user_id):
     Return activity history of one user.
     """
 
-    query = """
-    SELECT *
+    try:
 
-    FROM audit_logs
+        query = """
+        SELECT
+            *
+        FROM audit_logs
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        """
 
-    WHERE user_id = %s
+        return fetch_all(
+            query,
+            (user_id,)
+        )
 
-    ORDER BY created_at DESC
-    """
+    except Exception:
 
-    return fetch_all(
-        query,
-        (user_id,)
-    )
+        logger.exception(
+            f"Failed to fetch activity for User ID={user_id}"
+        )
+
+        return []
