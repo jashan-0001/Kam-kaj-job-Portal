@@ -16,6 +16,9 @@ def add_activity(
 ):
     """
     Save recruiter activity.
+
+    Returns:
+        bool: True if activity was saved successfully.
     """
 
     try:
@@ -40,13 +43,15 @@ def add_activity(
         if success:
 
             logger.info(
-                f"Activity added for Employer ID {employer_id}"
+                f"Activity added successfully "
+                f"for Employer ID={employer_id}"
             )
 
         else:
 
             logger.error(
-                f"Failed to add activity for Employer ID {employer_id}"
+                f"Failed to add activity "
+                f"for Employer ID={employer_id}"
             )
 
         return success
@@ -54,7 +59,8 @@ def add_activity(
     except Exception:
 
         logger.exception(
-            f"Activity service failed while adding activity for Employer ID {employer_id}"
+            f"Activity service failed while adding "
+            f"activity for Employer ID={employer_id}"
         )
 
         return False
@@ -69,12 +75,19 @@ def get_recent_activity(
 ):
     """
     Return latest recruiter activities.
+
+    Returns:
+        list[dict]
     """
 
     try:
 
         query = """
-        SELECT *
+        SELECT
+            id,
+            employer_id,
+            activity,
+            created_at
 
         FROM recruiter_activity
 
@@ -91,7 +104,8 @@ def get_recent_activity(
         )
 
         logger.info(
-            f"Fetched {len(activities)} activities for Employer ID {employer_id}"
+            f"Fetched {len(activities)} activities "
+            f"for Employer ID={employer_id}"
         )
 
         return activities
@@ -99,7 +113,54 @@ def get_recent_activity(
     except Exception:
 
         logger.exception(
-            f"Failed to fetch recruiter activities for Employer ID {employer_id}"
+            f"Failed to fetch recruiter activities "
+            f"for Employer ID={employer_id}"
         )
 
         return []
+
+
+# =====================================================
+# GET ACTIVITY COUNT
+# =====================================================
+
+def get_activity_count(
+    employer_id
+):
+    """
+    Return total recruiter activities
+    for an employer.
+    """
+
+    try:
+
+        from database.database import fetch_one
+
+        query = """
+        SELECT
+            COUNT(*) AS total
+
+        FROM recruiter_activity
+
+        WHERE employer_id = ?
+        """
+
+        row = fetch_one(
+            query,
+            (employer_id,)
+        )
+
+        return (
+            row["total"]
+            if row
+            else 0
+        )
+
+    except Exception:
+
+        logger.exception(
+            f"Failed to calculate activity count "
+            f"for Employer ID={employer_id}"
+        )
+
+        return 0
