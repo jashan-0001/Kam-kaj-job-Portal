@@ -1,5 +1,10 @@
+```python
 import os
 import sys
+
+# ============================================================
+# PROJECT ROOT
+# ============================================================
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(
@@ -10,31 +15,9 @@ PROJECT_ROOT = os.path.dirname(
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+
 from database.database import get_connection
 from utils.logger import logger
-
-
-def has_column(cursor, table_name, column_name):
-    cursor.execute(
-        f"PRAGMA table_info({table_name})"
-    )
-
-    return any(
-        row[1] == column_name
-        for row in cursor.fetchall()
-    )
-
-
-def add_column_if_missing(
-    cursor,
-    table_name,
-    column_name,
-    column_definition
-):
-    if not has_column(cursor, table_name, column_name):
-        cursor.execute(
-            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
-        )
 
 
 # ============================================================
@@ -43,7 +26,7 @@ def add_column_if_missing(
 
 def create_tables():
     """
-    Create all database tables and indexes.
+    Create all PostgreSQL/Supabase database tables and indexes.
     """
 
     conn = None
@@ -54,16 +37,6 @@ def create_tables():
 
         cursor = conn.cursor()
 
-# ============================================================
-# SQLITE PRODUCTION SETTINGS
-# ============================================================
-
-        cursor.execute("PRAGMA foreign_keys = ON;")
-        cursor.execute("PRAGMA journal_mode=DELETE;")
-        cursor.execute("PRAGMA synchronous = NORMAL;")
-        cursor.execute("PRAGMA temp_store = MEMORY;")
-        cursor.execute("PRAGMA cache_size = -20000")
-
         # ============================================================
         # USERS TABLE
         # ============================================================
@@ -71,7 +44,7 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
             full_name TEXT NOT NULL,
 
@@ -80,7 +53,7 @@ def create_tables():
             password TEXT NOT NULL,
 
             role TEXT NOT NULL
-                CHECK(role IN ('Admin','Employer','Candidate')),
+                CHECK(role IN ('Admin', 'Employer', 'Candidate')),
 
             phone TEXT,
 
@@ -98,7 +71,7 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
             title TEXT NOT NULL,
 
@@ -134,7 +107,7 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS applications (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
             job_id INTEGER NOT NULL,
 
@@ -142,9 +115,9 @@ def create_tables():
 
             resume_path TEXT NOT NULL,
 
-            ats_score REAL DEFAULT 0,
+            ats_score DOUBLE PRECISION DEFAULT 0,
 
-            match_percentage REAL DEFAULT 0,
+            match_percentage DOUBLE PRECISION DEFAULT 0,
 
             matched_skills TEXT,
 
@@ -178,7 +151,7 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS saved_jobs (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
             candidate_id INTEGER NOT NULL,
 
@@ -206,7 +179,7 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS notifications (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
             user_id INTEGER NOT NULL,
 
@@ -234,7 +207,7 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS recruiter_activity (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
             employer_id INTEGER NOT NULL,
 
@@ -248,42 +221,36 @@ def create_tables():
                 ON DELETE CASCADE
         )
         """)
+
         # ============================================================
         # AUDIT LOG TABLE
         # ============================================================
 
         cursor.execute("""
-CREATE TABLE IF NOT EXISTS audit_logs (
+        CREATE TABLE IF NOT EXISTS audit_logs (
 
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
 
-    user_id INTEGER,
+            user_id INTEGER,
 
-    user_role TEXT,
+            user_role TEXT,
 
-    action TEXT NOT NULL,
+            action TEXT NOT NULL,
 
-    details TEXT,
+            details TEXT,
 
-    description TEXT,
+            description TEXT,
 
-    ip_address TEXT,
+            ip_address TEXT,
 
-    created_at TIMESTAMP
-        DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY(user_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL
-)
-""")
-
-        if cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'"
-        ).fetchone():
-            add_column_if_missing(cursor, "audit_logs", "description", "TEXT")
-            add_column_if_missing(cursor, "audit_logs", "ip_address", "TEXT")
-
+            FOREIGN KEY(user_id)
+                REFERENCES users(id)
+                ON DELETE SET NULL
+        )
+        """)
 
         # ============================================================
         # INDEXES
@@ -291,50 +258,115 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
         indexes = [
 
-            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_users_email
+            ON users(email)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_users_role
+            ON users(role)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_jobs_posted_by ON jobs(posted_by)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_jobs_posted_by
+            ON jobs(posted_by)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_jobs_status
+            ON jobs(status)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_jobs_created_at
+            ON jobs(created_at)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_applications_job
+            ON applications(job_id)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_applications_user
+            ON applications(user_id)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_applications_status
+            ON applications(status)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_notifications_user
+            ON notifications(user_id)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_activity_employer ON recruiter_activity(employer_id)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_activity_employer
+            ON recruiter_activity(employer_id)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_audit_logs_user
+            ON audit_logs(user_id)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_audit_logs_action
+            ON audit_logs(action)
+            """,
 
-            "CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)",
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_audit_logs_created_at
+            ON audit_logs(created_at)
+            """
         ]
 
         for query in indexes:
+
             cursor.execute(query)
+
+        # ============================================================
+        # COMMIT
+        # ============================================================
 
         conn.commit()
 
         logger.info(
-            "Database initialized successfully."
+            "Supabase PostgreSQL database initialized successfully."
         )
 
-        print("=" * 50)
-        print("Database Created Successfully")
-        print("=" * 50)
+        print("=" * 60)
+        print("Supabase PostgreSQL Database Initialized Successfully")
+        print("=" * 60)
 
     except Exception:
 
+        if conn:
+
+            try:
+                conn.rollback()
+
+            except Exception:
+                pass
+
         logger.exception(
-            "Database initialization failed."
+            "Supabase PostgreSQL database initialization failed."
         )
 
         raise
@@ -343,7 +375,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
         if conn:
 
-            conn.close()
+            try:
+                conn.close()
+
+            except Exception:
+                pass
 
             logger.info(
                 "Database connection closed."
@@ -355,4 +391,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 # ============================================================
 
 if __name__ == "__main__":
+
     create_tables()
+```
