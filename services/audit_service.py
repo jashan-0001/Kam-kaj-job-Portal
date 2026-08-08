@@ -33,7 +33,6 @@ def ensure_audit_logs_columns(cursor):
 # =====================================================
 # LOG USER ACTIVITY
 # =====================================================
-
 def log_activity(
     user_id,
     action,
@@ -73,7 +72,7 @@ def log_activity(
                 created_at
             )
             VALUES
-            (?, ?, ?, ?, ?)
+            (%s, %s, %s, %s, %s)
             """,
             (
                 user_id,
