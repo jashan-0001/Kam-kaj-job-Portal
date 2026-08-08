@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import streamlit as st
 
 from database.database import (
@@ -9,30 +7,10 @@ from database.database import (
 )
 
 
-# =====================================================
-# ENSURE TABLE COLUMNS
-# =====================================================
-
-def ensure_audit_logs_columns(cursor):
-    """
-    Ensure required audit_logs columns exist
-    in PostgreSQL/Supabase.
-    """
-
-    cursor.execute("""
-        ALTER TABLE audit_logs
-        ADD COLUMN IF NOT EXISTS description TEXT
-    """)
-
-    cursor.execute("""
-        ALTER TABLE audit_logs
-        ADD COLUMN IF NOT EXISTS ip_address TEXT
-    """)
-
-
-# =====================================================
+# ============================================================
 # LOG USER ACTIVITY
-# =====================================================
+# ============================================================
+
 def log_activity(
     user_id,
     action,
@@ -40,7 +18,7 @@ def log_activity(
     ip_address=None
 ):
     """
-    Store activity in audit_logs.
+    Store user activity in audit_logs.
     """
 
     conn = None
@@ -51,15 +29,9 @@ def log_activity(
 
         cursor = conn.cursor()
 
-        # -------------------------------------------------
-        # Ensure required columns exist
-        # -------------------------------------------------
-
-        ensure_audit_logs_columns(cursor)
-
-        # -------------------------------------------------
-        # Insert activity
-        # -------------------------------------------------
+        # ----------------------------------------------------
+        # INSERT ACTIVITY
+        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -71,19 +43,26 @@ def log_activity(
                 ip_address,
                 created_at
             )
-            VALUES
-            (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
             """,
             (
                 user_id,
                 action,
                 description,
-                ip_address,
-                datetime.now()
+                ip_address
             )
         )
 
         conn.commit()
+
+        # ----------------------------------------------------
+        # CLEAR AUDIT CACHE
+        # ----------------------------------------------------
+
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
 
     except Exception:
 
@@ -108,9 +87,9 @@ def log_activity(
                 pass
 
 
-# =====================================================
+# ============================================================
 # RECENT ACTIVITIES
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -138,11 +117,11 @@ def get_recent_activities(limit=100):
     FROM audit_logs a
 
     LEFT JOIN users u
-    ON a.user_id = u.id
+        ON a.user_id = u.id
 
     ORDER BY a.created_at DESC
 
-    LIMIT ?
+    LIMIT %s
     """
 
     return fetch_all(
@@ -151,9 +130,9 @@ def get_recent_activities(limit=100):
     )
 
 
-# =====================================================
+# ============================================================
 # TOTAL ACTIVITIES
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -172,9 +151,9 @@ def total_activities():
     return row["total"] if row else 0
 
 
-# =====================================================
+# ============================================================
 # SUCCESSFUL LOGINS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -194,9 +173,9 @@ def successful_login_count():
     return row["total"] if row else 0
 
 
-# =====================================================
+# ============================================================
 # FAILED LOGINS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -216,9 +195,9 @@ def failed_login_count():
     return row["total"] if row else 0
 
 
-# =====================================================
+# ============================================================
 # ACTIVITIES BY ACTION
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -226,8 +205,7 @@ def failed_login_count():
 )
 def get_activities_by_action(action):
     """
-    Return all audit records
-    for one action.
+    Return audit records for one action.
     """
 
     query = """
@@ -235,7 +213,7 @@ def get_activities_by_action(action):
 
     FROM audit_logs
 
-    WHERE action = ?
+    WHERE action = %s
 
     ORDER BY created_at DESC
     """
@@ -246,9 +224,9 @@ def get_activities_by_action(action):
     )
 
 
-# =====================================================
+# ============================================================
 # USER ACTIVITY
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -256,8 +234,7 @@ def get_activities_by_action(action):
 )
 def get_user_activity(user_id):
     """
-    Return activity history
-    of one user.
+    Return activity history of one user.
     """
 
     query = """
@@ -265,7 +242,7 @@ def get_user_activity(user_id):
 
     FROM audit_logs
 
-    WHERE user_id = ?
+    WHERE user_id = %s
 
     ORDER BY created_at DESC
     """
