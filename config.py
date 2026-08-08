@@ -3,7 +3,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 # =====================================================
 # BASE DIRECTORY
 # =====================================================
@@ -23,10 +22,11 @@ DEBUG_MODE = True
 
 
 # =====================================================
-# DATABASE - CURRENT SQLITE
+# DATABASE - OLD SQLITE PATH
 # =====================================================
-# Keep this temporarily while we migrate to Supabase.
-# Do NOT delete it yet.
+
+# Kept only for compatibility with any old code.
+# The application now uses Supabase PostgreSQL.
 
 DATABASE_DIR = Path("/tmp")
 
@@ -41,12 +41,24 @@ DATABASE_PATH = DATABASE_DIR / "jobportal.db"
 # =====================================================
 # POSTGRESQL / SUPABASE
 # =====================================================
-# The actual connection string will be stored in
-# Streamlit Cloud Secrets, NOT in GitHub.
 
 SUPABASE_DATABASE_URL = os.getenv(
     "SUPABASE_DATABASE_URL"
 )
+
+# Streamlit Cloud Secrets
+try:
+
+    import streamlit as st
+
+    if "SUPABASE_DATABASE_URL" in st.secrets:
+
+        SUPABASE_DATABASE_URL = st.secrets[
+            "SUPABASE_DATABASE_URL"
+        ]
+
+except Exception:
+    pass
 
 
 # =====================================================
@@ -69,18 +81,13 @@ EXPORT_DIR = UPLOAD_DIR / "exports"
 # =====================================================
 
 for folder in [
-
     UPLOAD_DIR,
-
     RESUME_DIR,
-
     LOGO_DIR,
-
     REPORT_DIR,
-
     EXPORT_DIR
-
 ]:
+
     folder.mkdir(
         parents=True,
         exist_ok=True
@@ -95,7 +102,7 @@ ALLOWED_RESUME_EXTENSIONS = {
     "pdf"
 }
 
-MAX_RESUME_SIZE = 5 * 1024 * 1024      # 5 MB
+MAX_RESUME_SIZE = 5 * 1024 * 1024
 
 
 # =====================================================
@@ -105,6 +112,7 @@ MAX_RESUME_SIZE = 5 * 1024 * 1024      # 5 MB
 LOG_DIR = BASE_DIR / "logs"
 
 LOG_DIR.mkdir(
+    parents=True,
     exist_ok=True
 )
 
@@ -116,6 +124,19 @@ LOG_DIR.mkdir(
 GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY"
 )
+
+try:
+
+    import streamlit as st
+
+    if "GEMINI_API_KEY" in st.secrets:
+
+        GEMINI_API_KEY = st.secrets[
+            "GEMINI_API_KEY"
+        ]
+
+except Exception:
+    pass
 
 
 # =====================================================
@@ -129,4 +150,22 @@ EMAIL_ADDRESS = os.getenv(
 EMAIL_PASSWORD = os.getenv(
     "EMAIL_PASSWORD"
 )
-```
+
+try:
+
+    import streamlit as st
+
+    if "EMAIL_ADDRESS" in st.secrets:
+
+        EMAIL_ADDRESS = st.secrets[
+            "EMAIL_ADDRESS"
+        ]
+
+    if "EMAIL_PASSWORD" in st.secrets:
+
+        EMAIL_PASSWORD = st.secrets[
+            "EMAIL_PASSWORD"
+        ]
+
+except Exception:
+    pass
