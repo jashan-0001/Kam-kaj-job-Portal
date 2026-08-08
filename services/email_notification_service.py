@@ -1,3 +1,9 @@
+from constants import (
+    APPLICATION_SHORTLISTED,
+    APPLICATION_INTERVIEW,
+    APPLICATION_REJECTED,
+)
+
 from utils.email_service import send_email
 from utils.logger import logger
 
@@ -6,31 +12,61 @@ from templates.interview import interview_template
 from templates.rejected import rejected_template
 
 
-# =====================================================
+# ============================================================
 # SEND STATUS EMAIL
-# =====================================================
+# ============================================================
 
-def send_status_email(
-    application,
-    status
-):
+def send_status_email(application, status):
     """
-    Send an email based on application status.
+    Send an email to the candidate based on application status.
+
+    Supported statuses:
+        - Shortlisted
+        - Interview Scheduled
+        - Rejected
+
+    Pending status does not send an email.
     """
 
     try:
 
-        candidate_name = application["full_name"]
+        if not application:
+            logger.error(
+                "Cannot send status email: application data is missing."
+            )
+            return False
 
-        recipient = application["email"]
+        candidate_name = application.get("full_name")
+        recipient = application.get("email")
+        job_title = application.get("title")
 
-        job_title = application["title"]
+        if not recipient:
+            logger.error(
+                "Cannot send status email: candidate email is missing."
+            )
+            return False
+
+        if not candidate_name:
+            logger.error(
+                "Cannot send status email: candidate name is missing."
+            )
+            return False
+
+        if not job_title:
+            logger.error(
+                "Cannot send status email: job title is missing."
+            )
+            return False
 
         logger.info(
             f"Preparing {status} email for {recipient}"
         )
 
-        if status == "Shortlisted":
+        # ====================================================
+        # SHORTLISTED
+        # ====================================================
+
+        if status == APPLICATION_SHORTLISTED:
 
             subject = (
                 f"Congratulations! Shortlisted for {job_title}"
@@ -41,7 +77,11 @@ def send_status_email(
                 job_title
             )
 
-        elif status == "Interview Scheduled":
+        # ====================================================
+        # INTERVIEW
+        # ====================================================
+
+        elif status == APPLICATION_INTERVIEW:
 
             subject = (
                 f"Interview Invitation - {job_title}"
@@ -52,7 +92,11 @@ def send_status_email(
                 job_title
             )
 
-        elif status == "Rejected":
+        # ====================================================
+        # REJECTED
+        # ====================================================
+
+        elif status == APPLICATION_REJECTED:
 
             subject = (
                 f"Application Update - {job_title}"
@@ -63,13 +107,21 @@ def send_status_email(
                 job_title
             )
 
+        # ====================================================
+        # OTHER STATUS
+        # ====================================================
+
         else:
 
-            logger.warning(
-                f"Unknown application status: {status}"
+            logger.info(
+                f"No email required for application status: {status}"
             )
 
             return False
+
+        # ====================================================
+        # SEND EMAIL
+        # ====================================================
 
         success = send_email(
             recipient=recipient,
@@ -80,13 +132,15 @@ def send_status_email(
         if success:
 
             logger.info(
-                f"{status} email sent successfully to {recipient}"
+                f"{status} email sent successfully "
+                f"to {recipient}"
             )
 
         else:
 
             logger.error(
-                f"Failed to send {status} email to {recipient}"
+                f"Failed to send {status} email "
+                f"to {recipient}"
             )
 
         return success
@@ -94,7 +148,7 @@ def send_status_email(
     except Exception:
 
         logger.exception(
-            f"Email notification service failed for {application.get('email', 'Unknown User')}"
+            "Email notification service failed."
         )
 
         return False
