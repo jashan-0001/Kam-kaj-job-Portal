@@ -10,11 +10,11 @@ def validate_startup():
     """
 
     required_env = [
-        "EMAIL_ADDRESS",
-        "EMAIL_PASSWORD",
-        "GEMINI_API_KEY"
-    ]
-
+    "SUPABASE_DATABASE_URL",
+    "EMAIL_ADDRESS",
+    "EMAIL_PASSWORD",
+    "GEMINI_API_KEY"
+]
     missing = []
 
     for key in required_env:
