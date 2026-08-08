@@ -56,7 +56,6 @@ def create_admin():
 
             return True
 
-
         # ----------------------------------------------------
         # Hash administrator password
         # ----------------------------------------------------
@@ -64,7 +63,6 @@ def create_admin():
         hashed_password = hash_password(
             ADMIN_PASSWORD
         )
-
 
         # ----------------------------------------------------
         # Insert administrator
@@ -93,7 +91,6 @@ def create_admin():
             )
         )
 
-
         # ----------------------------------------------------
         # Result
         # ----------------------------------------------------
@@ -106,13 +103,11 @@ def create_admin():
 
             return True
 
-
         logger.error(
             "Failed to create default administrator account."
         )
 
         return False
-
 
     except Exception:
 
