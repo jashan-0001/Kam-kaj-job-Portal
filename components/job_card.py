@@ -1,5 +1,7 @@
 import streamlit as st
 
+from constants import JOB_OPEN
+
 from services.saved_job_service import (
     save_job,
     unsave_job,
@@ -17,112 +19,241 @@ from utils.file_validator import (
 )
 
 
+# ============================================================
+# JOB CARD
+# ============================================================
+
 def show_job_card(job, user_id):
     """
-    Display a professional job card with
-    resume upload and apply functionality.
+    Display a professional job card with:
+
+    - Job information
+    - Save / Unsave functionality
+    - Resume upload
+    - Duplicate application checking
+    - AI-powered application screening
     """
+
+    if not job:
+        return
+
+    job_id = job.get("id")
+
+    if job_id is None:
+        st.error(
+            "Invalid job information."
+        )
+        return
 
     with st.container(border=True):
 
-        st.subheader(f"💼 {job['title']}")
+        # ====================================================
+        # JOB TITLE
+        # ====================================================
 
-        st.markdown(f"**🏢 Company:** {job['company']}")
+        st.subheader(
+            f"💼 {job.get('title', 'Untitled Job')}"
+        )
+
+        # ====================================================
+        # COMPANY
+        # ====================================================
+
+        st.markdown(
+            f"**🏢 Company:** "
+            f"{job.get('company', 'Unknown Company')}"
+        )
 
         col1, col2 = st.columns(2)
 
+        # ====================================================
+        # JOB DETAILS
+        # ====================================================
+
         with col1:
-            st.write(f"📍 Location: {job['location']}")
-            st.write(f"💼 Experience: {job['experience']}")
+
+            st.write(
+                f"📍 Location: "
+                f"{job.get('location', 'Not specified')}"
+            )
+
+            st.write(
+                f"💼 Experience: "
+                f"{job.get('experience', 'Not specified')}"
+            )
 
         with col2:
-            st.write(f"💰 Salary: {job['salary']}")
 
-            status = job["status"] if "status" in job.keys() else "Open"
+            st.write(
+                f"💰 Salary: "
+                f"{job.get('salary', 'Not specified')}"
+            )
 
-            if status == "Open":
-                st.success("🟢 Open")
+            status = job.get(
+                "status",
+                JOB_OPEN
+            )
+
+            if status == JOB_OPEN:
+
+                st.success(
+                    "🟢 Open"
+                )
+
             else:
-                st.error("🔴 Closed")
 
-        st.markdown("### 🛠 Required Skills")
-        st.info(job["skills"])
+                st.error(
+                    "🔴 Closed"
+                )
 
-        st.markdown("### 📄 Job Description")
-        st.write(job["description"])
+        # ====================================================
+        # REQUIRED SKILLS
+        # ====================================================
+
+        st.markdown(
+            "### 🛠 Required Skills"
+        )
+
+        st.info(
+            job.get(
+                "skills",
+                "No specific skills listed."
+            )
+        )
+
+        # ====================================================
+        # JOB DESCRIPTION
+        # ====================================================
+
+        st.markdown(
+            "### 📄 Job Description"
+        )
+
+        st.write(
+            job.get(
+                "description",
+                "No description available."
+            )
+        )
 
         st.divider()
 
-        # ============================================
-        # Save / Unsave Job
-        # ============================================
+        # ====================================================
+        # SAVE / UNSAVE JOB
+        # ====================================================
 
-        saved = is_saved(user_id, job["id"])
+        saved = is_saved(
+            user_id,
+            job_id
+        )
 
         if saved:
 
             if st.button(
                 "💔 Remove from Saved Jobs",
-                key=f"unsave_{job['id']}"
+                key=f"unsave_{job_id}",
+                use_container_width=True
             ):
 
-                unsave_job(
+                success = unsave_job(
                     user_id,
-                    job["id"]
+                    job_id
                 )
 
-                st.success("Removed from Saved Jobs.")
+                if success:
 
-                st.rerun()
+                    st.success(
+                        "Removed from Saved Jobs."
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Unable to remove saved job."
+                    )
 
         else:
 
             if st.button(
                 "❤️ Save Job",
-                key=f"save_{job['id']}"
+                key=f"save_{job_id}",
+                use_container_width=True
             ):
 
-                save_job(
+                success = save_job(
                     user_id,
-                    job["id"]
+                    job_id
                 )
 
-                st.success("Job Saved.")
+                if success:
 
-                st.rerun()
+                    st.success(
+                        "Job Saved."
+                    )
 
-        # ============================================
-        # Resume Upload
-        # ============================================
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Unable to save job."
+                    )
+
+        # ====================================================
+        # ONLY OPEN JOBS CAN ACCEPT APPLICATIONS
+        # ====================================================
+
+        if status != JOB_OPEN:
+
+            st.warning(
+                "This job is currently closed "
+                "and is not accepting applications."
+            )
+
+            return
+
+        # ====================================================
+        # CHECK DUPLICATE APPLICATION
+        # ====================================================
+
+        existing_application = already_applied(
+            job_id,
+            user_id
+        )
+
+        if existing_application:
+
+            st.success(
+                "✅ Already Applied"
+            )
+
+            return
+
+        # ====================================================
+        # RESUME UPLOAD
+        # ====================================================
 
         resume = st.file_uploader(
             "Upload Resume (PDF only)",
             type=["pdf"],
-            key=f"resume_{job['id']}"
+            key=f"resume_{job_id}"
         )
 
-        # ============================================
-        # Duplicate Check
-        # ============================================
-
-        if already_applied(
-            job["id"],
-            user_id
-        ):
-
-            st.success("✅ Already Applied")
-
-            return
-
-        # ============================================
-        # Apply
-        # ============================================
+        # ====================================================
+        # APPLY NOW
+        # ====================================================
 
         if st.button(
             "🚀 Apply Now",
-            key=f"apply_{job['id']}",
+            key=f"apply_{job_id}",
             use_container_width=True
         ):
+
+            # ------------------------------------------------
+            # Validate Resume
+            # ------------------------------------------------
 
             is_valid, error = validate_resume(
                 resume
@@ -130,9 +261,15 @@ def show_job_card(job, user_id):
 
             if not is_valid:
 
-                st.error(error)
+                st.error(
+                    error
+                )
 
                 return
+
+            # ------------------------------------------------
+            # Save Resume
+            # ------------------------------------------------
 
             resume_path = save_resume(
                 resume
@@ -146,8 +283,12 @@ def show_job_card(job, user_id):
 
                 return
 
+            # ------------------------------------------------
+            # Submit Application
+            # ------------------------------------------------
+
             success = apply_job(
-                job["id"],
+                job_id,
                 user_id,
                 resume_path
             )
