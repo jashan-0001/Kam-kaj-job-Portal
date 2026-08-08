@@ -5,12 +5,16 @@ from database.database import (
     fetch_all,
     fetch_one
 )
+
 from utils.logger import logger
-from typing import List, Dict
 from utils.cache_manager import clear_cache
-# =====================================================
+
+from typing import List, Dict
+
+
+# ============================================================
 # ADD JOB
-# =====================================================
+# ============================================================
 
 def add_job(
     title,
@@ -23,7 +27,7 @@ def add_job(
     posted_by
 ):
     """
-    Add a new job.
+    Add a new job for an employer.
     """
 
     try:
@@ -40,7 +44,7 @@ def add_job(
             description,
             posted_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         success = execute_query(
@@ -75,9 +79,10 @@ def add_job(
 
         return False
 
-# =====================================================
-# GET ALL JOBS
-# =====================================================
+
+# ============================================================
+# GET ALL OPEN JOBS
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -105,7 +110,7 @@ def get_all_jobs() -> List[Dict]:
     INNER JOIN users
         ON jobs.posted_by = users.id
 
-    WHERE jobs.status='Open'
+    WHERE jobs.status = 'Open'
 
     ORDER BY jobs.created_at DESC
     """
@@ -113,15 +118,15 @@ def get_all_jobs() -> List[Dict]:
     return fetch_all(query)
 
 
-# =====================================================
+# ============================================================
 # GET JOBS BY EMPLOYER
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
     show_spinner=False
 )
-def get_jobs_by_employer(user_id)-> List[Dict]:
+def get_jobs_by_employer(user_id) -> List[Dict]:
 
     query = """
     SELECT
@@ -138,7 +143,7 @@ def get_jobs_by_employer(user_id)-> List[Dict]:
 
     FROM jobs
 
-    WHERE posted_by=?
+    WHERE posted_by = %s
 
     ORDER BY created_at DESC
     """
@@ -149,9 +154,9 @@ def get_jobs_by_employer(user_id)-> List[Dict]:
     )
 
 
-# =====================================================
+# ============================================================
 # GET JOB
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=300,
@@ -175,7 +180,7 @@ def get_job_by_id(job_id) -> Dict | None:
 
     FROM jobs
 
-    WHERE id=?
+    WHERE id = %s
     """
 
     return fetch_one(
@@ -184,9 +189,37 @@ def get_job_by_id(job_id) -> Dict | None:
     )
 
 
-# =====================================================
+# ============================================================
+# CHECK JOB OWNERSHIP
+# ============================================================
+
+def is_job_owner(
+    job_id,
+    employer_id
+):
+    """
+    Verify that a job belongs to the specified employer.
+    """
+
+    row = fetch_one(
+        """
+        SELECT id
+        FROM jobs
+        WHERE id = %s
+        AND posted_by = %s
+        """,
+        (
+            job_id,
+            employer_id
+        )
+    )
+
+    return row is not None
+
+
+# ============================================================
 # UPDATE JOB
-# =====================================================
+# ============================================================
 
 def update_job(
     job_id,
@@ -196,39 +229,61 @@ def update_job(
     experience,
     salary,
     skills,
-    description
+    description,
+    employer_id=None
 ):
     """
-    Update an existing job.
+    Update a job.
+
+    If employer_id is provided, ownership is verified.
     """
 
     try:
 
+        if employer_id is not None:
+
+            if not is_job_owner(
+                job_id,
+                employer_id
+            ):
+
+                logger.warning(
+                    f"Unauthorized job update attempt. "
+                    f"Job ID={job_id}, Employer ID={employer_id}"
+                )
+
+                return False
+
+
         query = """
         UPDATE jobs
+
         SET
-            title=?,
-            company=?,
-            location=?,
-            experience=?,
-            salary=?,
-            skills=?,
-            description=?
-        WHERE id=?
+            title = %s,
+            company = %s,
+            location = %s,
+            experience = %s,
+            salary = %s,
+            skills = %s,
+            description = %s
+
+        WHERE id = %s
         """
+
+        params = (
+            title,
+            company,
+            location,
+            experience,
+            salary,
+            skills,
+            description,
+            job_id
+        )
 
         success = execute_query(
             query,
-            (
-                title,
-                company,
-                location,
-                experience,
-                salary,
-                skills,
-                description,
-                job_id
-            )
+            params
         )
 
         if success:
@@ -249,19 +304,85 @@ def update_job(
 
         return False
 
-# =====================================================
-# DELETE JOB
-# =====================================================
 
-def delete_job(job_id):
+# ============================================================
+# DELETE JOB
+# ============================================================
+
+def delete_job(
+    job_id,
+    employer_id=None
+):
     """
     Delete a job.
+
+    Ownership is checked when employer_id is supplied.
+
+    IMPORTANT:
+    Because the database currently uses ON DELETE CASCADE,
+    deleting a job can also delete its applications.
     """
 
     try:
 
+        if employer_id is not None:
+
+            if not is_job_owner(
+                job_id,
+                employer_id
+            ):
+
+                logger.warning(
+                    f"Unauthorized job deletion attempt. "
+                    f"Job ID={job_id}, Employer ID={employer_id}"
+                )
+
+                return False
+
+
+        # ----------------------------------------------------
+        # Check for existing applications
+        # ----------------------------------------------------
+
+        application_row = fetch_one(
+            """
+            SELECT COUNT(*) AS total
+            FROM applications
+            WHERE job_id = %s
+            """,
+            (job_id,)
+        )
+
+        application_count = (
+            application_row["total"]
+            if application_row
+            else 0
+        )
+
+
+        # ----------------------------------------------------
+        # Prevent destructive deletion
+        # ----------------------------------------------------
+
+        if application_count > 0:
+
+            logger.warning(
+                f"Job deletion blocked because applications exist. "
+                f"Job ID={job_id}, Applications={application_count}"
+            )
+
+            return False
+
+
+        # ----------------------------------------------------
+        # Delete job
+        # ----------------------------------------------------
+
         success = execute_query(
-            "DELETE FROM jobs WHERE id=?",
+            """
+            DELETE FROM jobs
+            WHERE id = %s
+            """,
             (job_id,)
         )
 
@@ -283,22 +404,43 @@ def delete_job(job_id):
 
         return False
 
-# =====================================================
-# CLOSE JOB
-# =====================================================
 
-def close_job(job_id):
+# ============================================================
+# CLOSE JOB
+# ============================================================
+
+def close_job(
+    job_id,
+    employer_id=None
+):
     """
     Mark a job as Closed.
     """
 
     try:
 
+        if employer_id is not None:
+
+            if not is_job_owner(
+                job_id,
+                employer_id
+            ):
+
+                logger.warning(
+                    f"Unauthorized job close attempt. "
+                    f"Job ID={job_id}, Employer ID={employer_id}"
+                )
+
+                return False
+
+
         success = execute_query(
             """
             UPDATE jobs
-            SET status='Closed'
-            WHERE id=?
+
+            SET status = 'Closed'
+
+            WHERE id = %s
             """,
             (job_id,)
         )
@@ -322,22 +464,42 @@ def close_job(job_id):
         return False
 
 
-# =====================================================
+# ============================================================
 # REOPEN JOB
-# =====================================================
+# ============================================================
 
-def reopen_job(job_id):
+def reopen_job(
+    job_id,
+    employer_id=None
+):
     """
     Reopen a previously closed job.
     """
 
     try:
 
+        if employer_id is not None:
+
+            if not is_job_owner(
+                job_id,
+                employer_id
+            ):
+
+                logger.warning(
+                    f"Unauthorized job reopen attempt. "
+                    f"Job ID={job_id}, Employer ID={employer_id}"
+                )
+
+                return False
+
+
         success = execute_query(
             """
             UPDATE jobs
-            SET status='Open'
-            WHERE id=?
+
+            SET status = 'Open'
+
+            WHERE id = %s
             """,
             (job_id,)
         )
@@ -361,9 +523,9 @@ def reopen_job(job_id):
         return False
 
 
-# =====================================================
+# ============================================================
 # TOTAL JOBS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=30,
@@ -375,7 +537,7 @@ def total_jobs(user_id):
         """
         SELECT COUNT(*) AS total
         FROM jobs
-        WHERE posted_by=?
+        WHERE posted_by = %s
         """,
         (user_id,)
     )
@@ -383,9 +545,9 @@ def total_jobs(user_id):
     return row["total"] if row else 0
 
 
-# =====================================================
+# ============================================================
 # TOTAL OPEN JOBS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=30,
@@ -397,8 +559,8 @@ def total_open_jobs(user_id):
         """
         SELECT COUNT(*) AS total
         FROM jobs
-        WHERE posted_by=?
-        AND status='Open'
+        WHERE posted_by = %s
+        AND status = 'Open'
         """,
         (user_id,)
     )
@@ -406,9 +568,9 @@ def total_open_jobs(user_id):
     return row["total"] if row else 0
 
 
-# =====================================================
+# ============================================================
 # TOTAL CLOSED JOBS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=30,
@@ -420,8 +582,8 @@ def total_closed_jobs(user_id):
         """
         SELECT COUNT(*) AS total
         FROM jobs
-        WHERE posted_by=?
-        AND status='Closed'
+        WHERE posted_by = %s
+        AND status = 'Closed'
         """,
         (user_id,)
     )
@@ -429,9 +591,9 @@ def total_closed_jobs(user_id):
     return row["total"] if row else 0
 
 
-# =====================================================
+# ============================================================
 # GET OPEN JOBS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=60,
@@ -453,7 +615,7 @@ def get_open_jobs() -> List[Dict]:
 
     FROM jobs
 
-    WHERE status='Open'
+    WHERE status = 'Open'
 
     ORDER BY created_at DESC
     """
@@ -461,21 +623,21 @@ def get_open_jobs() -> List[Dict]:
     return fetch_all(query)
 
 
-# =====================================================
+# ============================================================
 # JOB SKILLS
-# =====================================================
+# ============================================================
 
 @st.cache_data(
     ttl=300,
     show_spinner=False
 )
-def get_job_skills(job_id)-> List[str]:
+def get_job_skills(job_id) -> List[str]:
 
     row = fetch_one(
         """
         SELECT skills
         FROM jobs
-        WHERE id=?
+        WHERE id = %s
         """,
         (job_id,)
     )
