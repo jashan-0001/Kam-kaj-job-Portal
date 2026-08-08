@@ -1,3 +1,4 @@
+```python
 import os
 from pathlib import Path
 
@@ -23,8 +24,10 @@ DEBUG_MODE = True
 
 
 # =====================================================
-# DATABASE
+# DATABASE - CURRENT SQLITE
 # =====================================================
+# Keep this temporarily while we migrate to Supabase.
+# Do NOT delete it yet.
 
 DATABASE_DIR = Path("/tmp")
 
@@ -34,6 +37,17 @@ DATABASE_DIR.mkdir(
 )
 
 DATABASE_PATH = DATABASE_DIR / "jobportal.db"
+
+
+# =====================================================
+# POSTGRESQL / SUPABASE
+# =====================================================
+# The actual connection string will be stored in
+# Streamlit Cloud Secrets, NOT in GitHub.
+
+SUPABASE_DATABASE_URL = os.getenv(
+    "SUPABASE_DATABASE_URL"
+)
 
 
 # =====================================================
@@ -116,3 +130,4 @@ EMAIL_ADDRESS = os.getenv(
 EMAIL_PASSWORD = os.getenv(
     "EMAIL_PASSWORD"
 )
+```
