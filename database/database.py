@@ -1,8 +1,11 @@
+```python
 import os
 import sys
-import sqlite3
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
+
+import psycopg
+from psycopg.rows import dict_row
 
 # =====================================================
 # PROJECT ROOT
@@ -17,37 +20,30 @@ PROJECT_ROOT = os.path.dirname(
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from config import DATABASE_PATH
+
+from config import SUPABASE_DATABASE_URL
 from utils.logger import logger
-print("CONNECTED DATABASE:", DATABASE_PATH)
 
 
 # =====================================================
 # DATABASE CONNECTION
 # =====================================================
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
     """
-    Create and configure a production SQLite connection.
+    Create a PostgreSQL connection to Supabase.
     """
 
-    conn = sqlite3.connect(
-        DATABASE_PATH,
-        timeout=30,
-        check_same_thread=False
+    if not SUPABASE_DATABASE_URL:
+        raise RuntimeError(
+            "SUPABASE_DATABASE_URL is not configured."
+        )
+
+    conn = psycopg.connect(
+        SUPABASE_DATABASE_URL,
+        connect_timeout=10,
+        row_factory=dict_row
     )
-
-    conn.row_factory = sqlite3.Row
-
-    # -------------------------------------------------
-    # SQLite Production Optimizations
-    # -------------------------------------------------
-    conn.execute("PRAGMA journal_mode=DELETE;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.execute("PRAGMA foreign_keys=ON;")
-    conn.execute("PRAGMA temp_store=MEMORY;")
-    conn.execute("PRAGMA cache_size=-64000;")      # ~64 MB cache
-    conn.execute("PRAGMA busy_timeout=30000;")
 
     return conn
 
@@ -59,24 +55,57 @@ def get_connection() -> sqlite3.Connection:
 @contextmanager
 def get_cursor():
     """
-    Provide a managed database cursor.
+    Provide a managed PostgreSQL connection and cursor.
     """
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
 
     try:
+
+        conn = get_connection()
+
+        cursor = conn.cursor()
 
         yield conn, cursor
 
     finally:
 
-        try:
-            cursor.close()
-        except Exception:
-            pass
+        if cursor:
 
-        conn.close()
+            try:
+                cursor.close()
+
+            except Exception:
+                pass
+
+        if conn:
+
+            try:
+                conn.close()
+
+            except Exception:
+                pass
+
+
+# =====================================================
+# SQL PLACEHOLDER CONVERSION
+# =====================================================
+
+def convert_query(query: str) -> str:
+    """
+    Convert SQLite-style ? placeholders to PostgreSQL %s.
+
+    Example:
+
+        SELECT * FROM users WHERE email = ?
+
+    becomes:
+
+        SELECT * FROM users WHERE email = %s
+    """
+
+    return query.replace("?", "%s")
 
 
 # =====================================================
@@ -94,8 +123,10 @@ def execute_query(
 
         with get_cursor() as (conn, cursor):
 
+            postgres_query = convert_query(query)
+
             cursor.execute(
-                query,
+                postgres_query,
                 params
             )
 
@@ -106,16 +137,21 @@ def execute_query(
     except Exception as e:
 
         try:
+
             if conn:
                 conn.rollback()
+
         except Exception:
             pass
 
         logger.exception(
-            f"execute_query failed.\nSQL:\n{query}\nError: {e}"
+            f"execute_query failed."
+            f"\nSQL: {query}"
+            f"\nError: {e}"
         )
 
         return False
+
 
 # =====================================================
 # FETCH ONE
@@ -130,8 +166,10 @@ def fetch_one(
 
         with get_cursor() as (_, cursor):
 
+            postgres_query = convert_query(query)
+
             cursor.execute(
-                query,
+                postgres_query,
                 params
             )
 
@@ -143,10 +181,12 @@ def fetch_one(
 
             return None
 
-    except Exception:
+    except Exception as e:
 
         logger.exception(
-            f"fetch_one failed.\nSQL: {query}"
+            f"fetch_one failed."
+            f"\nSQL: {query}"
+            f"\nError: {e}"
         )
 
         return None
@@ -165,8 +205,10 @@ def fetch_all(
 
         with get_cursor() as (_, cursor):
 
+            postgres_query = convert_query(query)
+
             cursor.execute(
-                query,
+                postgres_query,
                 params
             )
 
@@ -177,10 +219,12 @@ def fetch_all(
                 for row in rows
             ]
 
-    except Exception:
+    except Exception as e:
 
         logger.exception(
-            f"fetch_all failed.\nSQL: {query}"
+            f"fetch_all failed."
+            f"\nSQL: {query}"
+            f"\nError: {e}"
         )
 
         return []
@@ -201,8 +245,10 @@ def execute_many(
 
         with get_cursor() as (conn, cursor):
 
+            postgres_query = convert_query(query)
+
             cursor.executemany(
-                query,
+                postgres_query,
                 params_list
             )
 
@@ -210,13 +256,21 @@ def execute_many(
 
             return True
 
-    except Exception:
+    except Exception as e:
 
-        if conn:
-            conn.rollback()
+        try:
+
+            if conn:
+                conn.rollback()
+
+        except Exception:
+            pass
 
         logger.exception(
-            f"execute_many failed.\nSQL: {query}"
+            f"execute_many failed."
+            f"\nSQL: {query}"
+            f"\nError: {e}"
         )
 
         return False
+```
