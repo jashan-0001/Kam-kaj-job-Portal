@@ -20,7 +20,7 @@ load_dotenv(BASE_DIR / ".env")
 
 APP_NAME = "AI Job Portal"
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 # ============================================================
