@@ -1,14 +1,15 @@
 import os
 import sys
+
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 import psycopg
 from psycopg.rows import dict_row
 
-# =====================================================
+# ============================================================
 # PROJECT ROOT
-# =====================================================
+# ============================================================
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(
@@ -24,9 +25,9 @@ from config import SUPABASE_DATABASE_URL
 from utils.logger import logger
 
 
-# =====================================================
+# ============================================================
 # DATABASE CONNECTION
-# =====================================================
+# ============================================================
 
 def get_connection():
     """
@@ -38,23 +39,35 @@ def get_connection():
             "SUPABASE_DATABASE_URL is not configured."
         )
 
-    conn = psycopg.connect(
-        SUPABASE_DATABASE_URL,
-        connect_timeout=10,
-        row_factory=dict_row
-    )
+    try:
 
-    return conn
+        conn = psycopg.connect(
+            SUPABASE_DATABASE_URL,
+            connect_timeout=10,
+            row_factory=dict_row
+        )
+
+        return conn
+
+    except Exception:
+
+        logger.exception(
+            "Unable to connect to Supabase PostgreSQL."
+        )
+
+        raise
 
 
-# =====================================================
+# ============================================================
 # CONNECTION CONTEXT MANAGER
-# =====================================================
+# ============================================================
 
 @contextmanager
 def get_cursor():
     """
     Provide a managed PostgreSQL connection and cursor.
+
+    The connection is automatically closed after use.
     """
 
     conn = None
@@ -67,6 +80,18 @@ def get_cursor():
         cursor = conn.cursor()
 
         yield conn, cursor
+
+    except Exception:
+
+        if conn:
+
+            try:
+                conn.rollback()
+
+            except Exception:
+                pass
+
+        raise
 
     finally:
 
@@ -87,9 +112,9 @@ def get_cursor():
                 pass
 
 
-# =====================================================
+# ============================================================
 # SQL PLACEHOLDER CONVERSION
-# =====================================================
+# ============================================================
 
 def convert_query(query: str) -> str:
     """
@@ -97,24 +122,38 @@ def convert_query(query: str) -> str:
 
     Example:
 
-        SELECT * FROM users WHERE email = ?
+        SELECT *
+        FROM users
+        WHERE email = ?
 
     becomes:
 
-        SELECT * FROM users WHERE email = %s
+        SELECT *
+        FROM users
+        WHERE email = %s
     """
+
+    if not query:
+        return query
 
     return query.replace("?", "%s")
 
 
-# =====================================================
+# ============================================================
 # EXECUTE INSERT / UPDATE / DELETE
-# =====================================================
+# ============================================================
 
 def execute_query(
     query: str,
     params: tuple = ()
 ) -> bool:
+    """
+    Execute INSERT, UPDATE or DELETE query.
+
+    Returns:
+        True  -> successful transaction
+        False -> failed transaction
+    """
 
     conn = None
 
@@ -135,16 +174,16 @@ def execute_query(
 
     except Exception as e:
 
-        try:
+        if conn:
 
-            if conn:
+            try:
                 conn.rollback()
 
-        except Exception:
-            pass
+            except Exception:
+                pass
 
         logger.exception(
-            f"execute_query failed."
+            "execute_query failed."
             f"\nSQL: {query}"
             f"\nError: {e}"
         )
@@ -152,14 +191,79 @@ def execute_query(
         return False
 
 
-# =====================================================
+# ============================================================
+# EXECUTE QUERY AND RETURN INSERTED ROW
+# ============================================================
+
+def execute_returning(
+    query: str,
+    params: tuple = ()
+) -> Optional[Dict[str, Any]]:
+    """
+    Execute an INSERT/UPDATE query containing
+    RETURNING and return the resulting row.
+
+    Example:
+
+        INSERT INTO users (...)
+        VALUES (...)
+        RETURNING id
+    """
+
+    conn = None
+
+    try:
+
+        with get_cursor() as (conn, cursor):
+
+            postgres_query = convert_query(query)
+
+            cursor.execute(
+                postgres_query,
+                params
+            )
+
+            row = cursor.fetchone()
+
+            conn.commit()
+
+            if row:
+                return dict(row)
+
+            return None
+
+    except Exception as e:
+
+        if conn:
+
+            try:
+                conn.rollback()
+
+            except Exception:
+                pass
+
+        logger.exception(
+            "execute_returning failed."
+            f"\nSQL: {query}"
+            f"\nError: {e}"
+        )
+
+        return None
+
+
+# ============================================================
 # FETCH ONE
-# =====================================================
+# ============================================================
 
 def fetch_one(
     query: str,
     params: tuple = ()
 ) -> Optional[Dict[str, Any]]:
+    """
+    Execute SELECT query and return one row.
+
+    Returns a normal Python dictionary.
+    """
 
     try:
 
@@ -175,7 +279,6 @@ def fetch_one(
             row = cursor.fetchone()
 
             if row:
-
                 return dict(row)
 
             return None
@@ -183,7 +286,7 @@ def fetch_one(
     except Exception as e:
 
         logger.exception(
-            f"fetch_one failed."
+            "fetch_one failed."
             f"\nSQL: {query}"
             f"\nError: {e}"
         )
@@ -191,14 +294,19 @@ def fetch_one(
         return None
 
 
-# =====================================================
+# ============================================================
 # FETCH ALL
-# =====================================================
+# ============================================================
 
 def fetch_all(
     query: str,
     params: tuple = ()
 ) -> List[Dict[str, Any]]:
+    """
+    Execute SELECT query and return all rows.
+
+    Returns a list of normal Python dictionaries.
+    """
 
     try:
 
@@ -221,7 +329,7 @@ def fetch_all(
     except Exception as e:
 
         logger.exception(
-            f"fetch_all failed."
+            "fetch_all failed."
             f"\nSQL: {query}"
             f"\nError: {e}"
         )
@@ -229,14 +337,18 @@ def fetch_all(
         return []
 
 
-# =====================================================
+# ============================================================
 # EXECUTE MANY
-# =====================================================
+# ============================================================
 
 def execute_many(
     query: str,
     params_list: list
 ) -> bool:
+    """
+    Execute the same INSERT/UPDATE/DELETE query
+    for multiple parameter sets.
+    """
 
     conn = None
 
@@ -257,16 +369,16 @@ def execute_many(
 
     except Exception as e:
 
-        try:
+        if conn:
 
-            if conn:
+            try:
                 conn.rollback()
 
-        except Exception:
-            pass
+            except Exception:
+                pass
 
         logger.exception(
-            f"execute_many failed."
+            "execute_many failed."
             f"\nSQL: {query}"
             f"\nError: {e}"
         )
