@@ -15,7 +15,8 @@ from database.database import (
 
 def ensure_audit_logs_columns(cursor):
     """
-    Ensure required audit_logs columns exist in PostgreSQL/Supabase.
+    Ensure required audit_logs columns exist
+    in PostgreSQL/Supabase.
     """
 
     cursor.execute("""
@@ -43,15 +44,23 @@ def log_activity(
     Store activity in audit_logs.
     """
 
+    conn = None
+
     try:
 
         conn = get_connection()
 
         cursor = conn.cursor()
 
-        ensure_audit_logs_columns(
-            cursor
-        )
+        # -------------------------------------------------
+        # Ensure required columns exist
+        # -------------------------------------------------
+
+        ensure_audit_logs_columns(cursor)
+
+        # -------------------------------------------------
+        # Insert activity
+        # -------------------------------------------------
 
         cursor.execute(
             """
@@ -77,9 +86,27 @@ def log_activity(
 
         conn.commit()
 
+    except Exception:
+
+        if conn:
+
+            try:
+                conn.rollback()
+
+            except Exception:
+                pass
+
+        raise
+
     finally:
 
-        conn.close()
+        if conn:
+
+            try:
+                conn.close()
+
+            except Exception:
+                pass
 
 
 # =====================================================
@@ -161,7 +188,7 @@ def successful_login_count():
         SELECT
             COUNT(*) AS total
         FROM audit_logs
-        WHERE action='LOGIN_SUCCESS'
+        WHERE action = 'LOGIN_SUCCESS'
         """
     )
 
@@ -183,7 +210,7 @@ def failed_login_count():
         SELECT
             COUNT(*) AS total
         FROM audit_logs
-        WHERE action='LOGIN_FAILED'
+        WHERE action = 'LOGIN_FAILED'
         """
     )
 
