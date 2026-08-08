@@ -1,40 +1,80 @@
 import os
 from pathlib import Path
 
+import streamlit as st
+
 from utils.logger import logger
 
+
+def get_config_value(key: str):
+    """
+    Get configuration value from:
+    1. Streamlit secrets
+    2. Environment variables
+    """
+
+    # Streamlit Cloud / production
+    try:
+        if key in st.secrets:
+            value = st.secrets[key]
+
+            if value:
+                return value
+
+    except Exception:
+        pass
+
+    # Local .env / environment
+    return os.getenv(key)
+
+
+# ============================================================
+# STARTUP VALIDATION
+# ============================================================
 
 def validate_startup():
     """
     Validate application configuration before startup.
     """
 
-    required_env = [
-    "SUPABASE_DATABASE_URL",
-    "EMAIL_ADDRESS",
-    "EMAIL_PASSWORD",
-    "GEMINI_API_KEY"
-]
+    required_config = [
+        "SUPABASE_DATABASE_URL",
+        "EMAIL_ADDRESS",
+        "EMAIL_PASSWORD",
+        "GEMINI_API_KEY",
+    ]
+
     missing = []
 
-    for key in required_env:
+    for key in required_config:
 
-        if not os.getenv(key):
+        value = get_config_value(key)
+
+        if not value:
             missing.append(key)
+
+    # --------------------------------------------------------
+    # Missing configuration
+    # --------------------------------------------------------
 
     if missing:
 
         logger.error(
-            f"Missing environment variables: {', '.join(missing)}"
+            f"Missing configuration: {', '.join(missing)}"
         )
 
         raise RuntimeError(
-            f"Missing environment variables: {', '.join(missing)}"
+            "Missing required configuration: "
+            + ", ".join(missing)
         )
+
+    # --------------------------------------------------------
+    # Required folders
+    # --------------------------------------------------------
 
     folders = [
         "uploads",
-        "logs"
+        "logs",
     ]
 
     for folder in folders:
@@ -43,6 +83,10 @@ def validate_startup():
             parents=True,
             exist_ok=True
         )
+
+    # --------------------------------------------------------
+    # Validation successful
+    # --------------------------------------------------------
 
     logger.info(
         "Startup validation completed successfully."
