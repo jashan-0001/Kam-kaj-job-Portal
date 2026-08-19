@@ -1,9 +1,9 @@
+import bcrypt
+
 from database.database import (
     execute_query,
     fetch_one
 )
-
-from services.auth import hash_password
 
 from constants import ROLE_ADMIN
 
@@ -21,6 +21,31 @@ ADMIN_EMAIL = "admin@jobportal.com"
 ADMIN_PASSWORD = "Admin@123"
 
 ADMIN_PHONE = "9999999999"
+
+
+# ============================================================
+# PASSWORD HASHING
+# ============================================================
+
+def hash_password(password):
+    """
+    Hash a plain text password using bcrypt.
+    """
+
+    try:
+
+        return bcrypt.hashpw(
+            password.encode("utf-8"),
+            bcrypt.gensalt()
+        ).decode("utf-8")
+
+    except Exception:
+
+        logger.exception(
+            "Administrator password hashing failed."
+        )
+
+        raise
 
 
 # ============================================================
@@ -45,7 +70,9 @@ def create_admin():
             FROM users
             WHERE email = ?
             """,
-            (ADMIN_EMAIL,)
+            (
+                ADMIN_EMAIL,
+            )
         )
 
         if existing:
